@@ -15,6 +15,30 @@
 #include <string>
 #include <vector>
 
+enum eCmdOpType {
+	Imm8,
+	Imm16,
+	Imm32,
+	Reg8,
+	Reg16,
+	Rm8,
+	Rm16,
+	Op_Error
+};
+
+enum eCmdStat {
+	Error,
+	Label,
+	Valid
+};
+
+struct CmdOperand {
+	eCmdStat	valid;
+	std::string	data;
+	eCmdOpType	type;
+	std::string	label;
+};
+
 class Command {
 	public:
 		static Command* MakeCommand(std::string inst, std::string prefix, std::vector<std::string> operands, std::string label);
@@ -36,6 +60,8 @@ class Command {
 		void AppendImm(const std::string & str);
 		void AppendReg(const std::string & str);
 		void AppendRm(const std::string & str);
+
+		void AppendOperand(const CmdOperand & op);
 
 		void SetLine(const std::string & str) { mLine.assign(str.substr(0, str.size()-1)); }
 

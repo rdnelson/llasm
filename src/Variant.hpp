@@ -34,17 +34,17 @@ class Variant {
 
 	private:
 
-		static std::string getByte(const std::string&);
-		static std::string getWord(const std::string&);
-		static std::string getDword(const std::string&);
-		static std::string getRm8(const std::string&, bool);
-		static std::string getRm16(const std::string&, bool);
-		static std::string _getRm(const std::string&);
-		static std::string getReg8(const std::string&);
-		static std::string getReg16(const std::string&);
-		static std::string getSegReg(const std::string&);
-		static std::string getLabel(const std::string&);
-		static std::string getDirectAddr(const std::string&);
+		static CmdOperand getByte(const std::string&);
+		static CmdOperand getWord(const std::string&);
+		static CmdOperand getDword(const std::string&);
+		static CmdOperand getRm8(const std::string&, bool);
+		static CmdOperand getRm16(const std::string&, bool);
+		static CmdOperand _getRm(const std::string&, eCmdOpType);
+		static CmdOperand getReg8(const std::string&);
+		static CmdOperand getReg16(const std::string&);
+		static CmdOperand getSegReg(const std::string&);
+		static CmdOperand getLabel(const std::string&);
+		static CmdOperand getDirectAddr(const std::string&);
 
 		unsigned int mOpcode;
 		unsigned int mNum;

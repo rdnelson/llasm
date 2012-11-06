@@ -24,58 +24,65 @@ Command* Variant::CreateCommand(const std::string & prefix, const std::vector<st
 		return 0;
 	}
 
-	std::string val;
+	CmdOperand val;
 
 	for(unsigned int i = 0; i < operands.size(); i++) {
 		switch(mArgs[i]) {
 			case InstTable::IMM8:
-				if((val = getByte(operands[i])) == "") {
+				val = getByte(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendImm(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::IMM16:
-				if((val = getWord(operands[i])) == "") {
+				val = getWord(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendImm(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::RM8:
-				if((val = getRm8(operands[i], i == 0)) == "") {
+				val = getRm8(operands[i], i == 0);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendRm(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::RM16:
-				if((val = getRm16(operands[i], i == 0)) == "") {
+				val = getRm16(operands[i], i == 0);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendRm(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::R8:
-				if((val = getReg8(operands[i])) == "") {
+				val = getReg8(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendReg(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::R16:
-				if((val = getReg16(operands[i])) == "") {
+				val = getReg16(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendReg(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::SREG:
-				if((val = getSegReg(operands[i])) == "") {
+				val = getSegReg(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendReg(val);
+				newCmd->AppendOperand(val);
 				break;
 			//These ones are all hardcoded into the opcode
 			case InstTable::AL:
@@ -177,25 +184,28 @@ Command* Variant::CreateCommand(const std::string & prefix, const std::vector<st
 
 			//Not hardcoded anymore
 			case InstTable::PTR16:
-				if((val = getDword(operands[i])) == "") {
+				val = getDword(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendImm(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::REL8:
-				if((val = getByte(operands[i])) == "") {
+				val = getByte(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;       
 					return 0;
 				}
-				newCmd->AppendImm(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::REL16:
-				if((val = getWord(operands[i])) == "") {
+				val = getWord(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendImm(val);
+				newCmd->AppendOperand(val);
 				break;
 			case InstTable::FIXED1:
 				if(operands[i] != "1") {
@@ -235,11 +245,12 @@ Command* Variant::CreateCommand(const std::string & prefix, const std::vector<st
 				break;
 			case InstTable::MOFF8:
 			case InstTable::MOFF16:
-				if((val = getDirectAddr(operands[i])) == "") {
+				val = getDirectAddr(operands[i]);
+				if(val.valid == Error) {
 					delete newCmd;
 					return 0;
 				}
-				newCmd->AppendImm(val);
+				newCmd->AppendOperand(val);
 				break;
 			default:
 				delete newCmd;
@@ -252,43 +263,61 @@ Command* Variant::CreateCommand(const std::string & prefix, const std::vector<st
 	return newCmd;
 }
 
-std::string Variant::getByte(const std::string& str) {
+CmdOperand Variant::getByte(const std::string& str) {
 	std::string t;
+
+	CmdOperand retVal;
+	retVal.type = Imm8;
 
 	unsigned int start = 0;
 	unsigned int end = 0;
 	unsigned char val = 0;
 	bool hex = false;
 
-	if(str.find("H") == str.size() - 1 && str.size() >= 2 && str.size() <= 3) {
+	if((str.find_first_of("1234567890") == 0) &&
+			str.find_first_not_of("1234567890ABCDEF") == str.size() - 1 &&
+			str.find("H") == str.size() - 1 &&
+			str.size() >= 2 &&
+			str.size() <= 3) {
+
 		start = 0;
 		end = str.size() - 1;
 		hex = true;
 	}
 
 	//normal hex
-	if(str.find("0X") == 0 && str.size() <= 4 && str.size() >= 3) {
+	if(str.find("0X") == 0 &&
+			str.find_first_not_of("1234567890ABCDEF", 2) == std::string::npos &&
+			str.size() <= 4 &&
+			str.size() >= 3) {
 		start = 2;
 		end = str.size();
 		hex = true;
 	}
 
 	if(!hex && str.find_first_not_of("1234567890") != std::string::npos) {
-		return "";
+		retVal.valid = Label;
+		retVal.label = str;
+		return retVal;
 	} else if(!hex) { //decimal number
 
 		for(unsigned int i = 0; i < str.size(); i++) {
 			val += (int)pow(10, (str.size() - i - 1)) * (str[i] - '0');
-			if(val > 0x100)
-				return "";
+			if(val > 0x100) {
+				retVal.valid = Error;
+				retVal.data = "Data exceeds size bounds";
+			}
 		}
-		t.append(1,val);
-		return t;
+		retVal.data.append(1, val);
+		retVal.valid = Valid;
+		return retVal;
 	}
 
 
 	if(start == 0 && end == 0) {
-		return "";
+		retVal.data = "No immediate provided";
+		retVal.valid = Error;
+		return retVal;
 	}
 
 	for(unsigned int i = start; i < end; i++) {
@@ -298,48 +327,73 @@ std::string Variant::getByte(const std::string& str) {
 		} else if(str[2] >= 'A' && str[2] <= 'F') {
 			val += str[i] - 'A' + 10;
 		} else {
-			return "";
+			retVal.data = "Invalid hex character: " + str[i];
+			retVal.valid = Error;
+			return retVal;
 		}
 	}
-	t.append(1,val);
-	return t;
+	retVal.data.append(1, val);
+	retVal.valid = Valid;
+	return retVal;
 }
 
-std::string Variant::getWord(const std::string & str) {
+CmdOperand Variant::getWord(const std::string & str) {
 	std::string t;
+	CmdOperand retVal;
+	retVal.type = Imm8;
 
 	unsigned int start = 0;
 	unsigned int end = 0;
 	unsigned int val = 0;
 	bool hex = false;
 
-	if(str.find("H") == str.size() - 1 && str.size() >= 2 && str.size() <= 3) {
+	if((str.find_first_of("1234567890") == 0) &&
+			str.find_first_not_of("1234567890ABCDEF") == str.size() - 1 &&
+			str.find("H") == str.size() - 1 &&
+			str.size() >= 2 &&
+			str.size() <= 3) {
+
 		start = 0;
 		end = str.size() - 1;
 		hex = true;
-	} else if(str.find("0X") == 0 && str.size() <= 4 && str.size() >= 3) {
+	}
+
+	//normal hex
+	if(str.find("0X") == 0 &&
+			str.find_first_not_of("1234567890ABCDEF", 2) == std::string::npos &&
+			str.size() <= 4 &&
+			str.size() >= 3) {
 		start = 2;
 		end = str.size();
 		hex = true;
-	} 
+	}
 
 	if(!hex && str.find_first_not_of("1234567890") != std::string::npos) {
-		return "";
+		retVal.label = str;
+		retVal.valid = Label;
+		return retVal;
 	} else if(!hex) { //decimal number
 
 		for(unsigned int i = 0; i < str.size(); i++) {
 			val += (int)pow(10, (str.size() - i - 1)) * (str[i] - '0');
-			if(val > 0x10000)
-				return "";
+			if(val > 0x10000) {
+				retVal.data = "Data exceeds size bounds";
+				retVal.valid = Error;
+				return retVal;
+			}
 		}
-		t.append(1,(char)((val & 0xFF00) >> 8));
-		t.append(1,(char)(val & 0xFF));
-		return t;
+		retVal.valid = Valid;
+		retVal.data.append(1,(char)((val & 0xFF00) >> 8));
+		retVal.data.append(1,(char)(val & 0xFF));
+		return retVal;
 	}
 
 
-	if(end == 0 && start == 0)
-		return "";
+	if(end == 0 && start == 0) {
+		retVal.valid = Error;
+		retVal.data = "No operand provided";
+		return retVal;
+	}
 
 	for(unsigned int i = start; i < end; i++) {
 		val <<= 4;
@@ -348,134 +402,156 @@ std::string Variant::getWord(const std::string & str) {
 		} else if(str[2] >= 'A' && str[2] <= 'F') {
 			val += str[i] - 'A' + 10;
 		} else {
-			return "";
+			retVal.valid = Error;
+			retVal.data = "Invalid hex character";
+			return retVal;
 		}
 	}
 
-	t.append(1,(char)((val & 0xFF00) >> 8));
-	t.append(1,(char)(val & 0xFF));
-	return t;
+	retVal.valid = Valid;
+	retVal.data.append(1,(char)((val & 0xFF00) >> 8));
+	retVal.data.append(1,(char)(val & 0xFF));
+	return retVal;
 }
 
-std::string Variant::getRm8(const std::string & str, bool isOp1) {
+CmdOperand Variant::getRm8(const std::string & str, bool isOp1) {
 
 	std::string tmp = str;
+	CmdOperand retVal;
+	retVal.type = Rm8;
 
 	if(tmp == "AL") {
-		tmp.clear();
-		tmp.append(1, (char)0xC0);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC0);
+		return retVal;
 	}
 	if(tmp == "CL") {
-		tmp.clear();
-		tmp.append(1, (char)0xC1);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC1);
+		return retVal;
 	}
 	if(tmp == "DL") {
-		tmp.clear();
-		tmp.append(1, (char)0xC2);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC2);
+		return retVal;
 	}
 	if(tmp == "BL") {
-		tmp.clear();
-		tmp.append(1, (char)0xC3);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC3);
+		return retVal;
 	}
 	if(tmp == "AH") {
-		tmp.clear();
-		tmp.append(1, (char)0xC4);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC4);
+		return retVal;
 	}
 	if(tmp == "CH") {
-		tmp.clear();
-		tmp.append(1, (char)0xC5);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC5);
+		return retVal;
 	}
 	if(tmp == "DH") {
-		tmp.clear();
-		tmp.append(1, (char)0xC6);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC6);
+		return retVal;
 	}
 	if(tmp == "BH") {
-		tmp.clear();
-		tmp.append(1, (char)0xC7);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC7);
+		return retVal;
 	}
 
-	if(str.find("WORD ") == 0)
-		return "";
+	if(str.find("WORD ") == 0) {
+		retVal.valid = Error;
+		retVal.data = "";
+		return retVal;
+	}
 
 	if(str.find("BYTE ") == 0)
 		tmp = str.substr(5);
-	else
-		if(isOp1) // size is mandatory for op1
-			return "";
+	else {
+		if(isOp1) {// size is mandatory for op1
+			retVal.valid = Error;
+			retVal.data = "Ambiguous destination size";
+			return retVal;
+		}
+	}
 
-	return _getRm(tmp);
+	return _getRm(tmp, Rm8);
 }
 
-std::string Variant::getRm16(const std::string & str, bool isOp1) {
+CmdOperand Variant::getRm16(const std::string & str, bool isOp1) {
 
 	std::string tmp = str;
+	CmdOperand retVal;
 
 	if(tmp == "AX") {
-		tmp.clear();
-		tmp.append(1, (char)0xC0);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC0);
+		return retVal;
 	}
 	if(tmp == "CX") {
-		tmp.clear();
-		tmp.append(1, (char)0xC1);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC1);
+		return retVal;
 	}
 	if(tmp == "DX") {
-		tmp.clear();
-		tmp.append(1, (char)0xC2);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC2);
+		return retVal;
 	}
 	if(tmp == "BX") {
-		tmp.clear();
-		tmp.append(1, (char)0xC3);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC3);
+		return retVal;
 	}
 	if(tmp == "SP") {
-		tmp.clear();
-		tmp.append(1, (char)0xC4);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC4);
+		return retVal;
 	}
 	if(tmp == "BP") {
-		tmp.clear();
-		tmp.append(1, (char)0xC5);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC5);
+		return retVal;
 	}
 	if(tmp == "SI") {
-		tmp.clear();
-		tmp.append(1, (char)0xC6);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC6);
+		return retVal;
 	}
 	if(tmp == "DI") {
-		tmp.clear();
-		tmp.append(1, (char)0xC7);
-		return tmp;
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0xC7);
+		return retVal;
 	}
 
-	if(str.find("BYTE ") == 0)
-		return "";
+	if(str.find("BYTE ") == 0) {
+		retVal.valid = Error;
+		return retVal;
+	}
 
 	if(str.find("WORD ") == 0)
 		tmp = str.substr(5);
-	else
-		if(isOp1) // size is mandatory if it's the first operand
-			return "";
-
-	return _getRm(tmp);
+	else {
+		if(isOp1) { // size is mandatory if it's the first operand
+			retVal.valid = Error;
+			retVal.data = "Ambiguous destination size";
+			return retVal;
+		}
+	}
+	return _getRm(tmp, Rm16);
 }
 
 
-std::string Variant::_getRm(const std::string & str) {
+CmdOperand Variant::_getRm(const std::string & str, eCmdOpType type) {
 
 	std::string tmp;
 	std::string disp;
+	CmdOperand retVal;
+	retVal.type = type;
+	retVal.valid = Error;
+
 	unsigned int terms = 0;
 	unsigned char modrm = 0;
 
@@ -499,8 +575,18 @@ std::string Variant::_getRm(const std::string & str) {
 			terms++;
 		} else if((disp = getWord(tmp)) != "") {
 			terms++;
-		} else {
-			return "";
+		} else { //label
+			//check for starting letter, and valid characters
+			if(tmp.find_first_not_of("QWERTYUIOPASDFGHJKLZXCVBNM1234567890_") == 
+					std::string::npos &&
+				tmp.find_first_of("QWERTYUIOPASDFGHJKLZXCVBNM") == 0) {
+
+				retVal.label = tmp;
+				retVal.valid = Label;
+			} else {
+				retVal.data = "Invalid symbol";
+				return retVal;
+			}
 		}
 
 		start = end + 1;
@@ -508,7 +594,8 @@ std::string Variant::_getRm(const std::string & str) {
 		if(end == std::string::npos)
 			end = str.size() - 2;
 	} else {
-		return "";
+		retVal.data = "Invalid effective address";
+		return retVal;
 	}
 
 	if(terms == 0x41) {//BP only exception
@@ -550,109 +637,183 @@ std::string Variant::_getRm(const std::string & str) {
 		modrm = 0x06;
 	}
 
-	tmp.clear();
-	tmp.append(1, modrm);
-	if(disp.size() != 0)
-		tmp.append(disp);
+	if(retVal.valid != Label)
+		retVal.valid = Valid;
 
-	return tmp;
+	retVal.data.append(1, modrm);
+	if(disp.size() != 0)
+		retVal.data.append(disp);
+
+	return retVal;
 }
 
-std::string Variant::getReg8(const std::string& str) {
+CmdOperand Variant::getReg8(const std::string& str) {
 	std::string tmp;
+	CmdOperand retVal;
+	retVal.type = Reg8;
+	retVal.valid = Error;
+
 	if(str == "AL" ){
-		tmp.append(1, (char)0x00);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x00);
 	}
 	if(str == "AH") {
-		tmp.append(1, (char)0x10);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x10);
 	}
 	if(str == "BL") {
-		tmp.append(1, (char)0x18);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x18);
 	}
 	if(str == "BH") {
-		tmp.append(1, (char)0x38);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x38);
 	}
 	if(str == "CL") {
-		tmp.append(1, (char)0x08);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x08);
 	}
 	if(str == "CH") {
-		tmp.append(1, (char)0x28);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x28);
 	}
 	if(str == "DL") {
-		tmp.append(1, (char)0x10);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x10);
 	}
 	if(str == "DH") {
-		tmp.append(1, (char)0x30);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x30);
 	}
-	return tmp;
+
+	if(retVal.data.size() == 0) {
+		retVal.data = "Invalid Register";
+	}
+
+	return retVal;
 }
 
-std::string Variant::getReg16(const std::string& str) {
+CmdOperand Variant::getReg16(const std::string& str) {
 	std::string tmp;
+	CmdOperand retVal;
+	retVal.valid = Error;
+	retVal.type = Reg16;
+
 	if(str == "AX") {
-		tmp.append(1, (char)0x00);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x00);
 	}
 	if(str == "SP") {
-		tmp.append(1, (char)0x10);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x10);
 	}
 	if(str == "CX") {
-		tmp.append(1, (char)0x18);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x18);
 	}
 	if(str == "BP") {
-		tmp.append(1, (char)0x38);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x38);
 	}
 	if(str == "DX") {
-		tmp.append(1, (char)0x08);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x08);
 	}
 	if(str == "SI") {
-		tmp.append(1, (char)0x28);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x28);
 	}
 	if(str == "BX") {
-		tmp.append(1, (char)0x10);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x10);
 	}
 	if(str == "DI") {
-		tmp.append(1, (char)0x30);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x30);
 	}
-	return tmp;
+
+	if(retVal.data.size() == 0) {
+		retVal.data = "Invalid register";
+	}
+
+	return retVal;
 }
 
-std::string Variant::getSegReg(const std::string& str) {
+CmdOperand Variant::getSegReg(const std::string& str) {
 	std::string tmp;
+	CmdOperand retVal;
+	retVal.type = Reg16;
+	retVal.valid = Error;
+
 	if (str == "CS") {
-		tmp.append(1, (char)0x08);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x08);
 	}
 	if(str == "DS") {
-		tmp.append(1, (char)0x18);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x18);
 	}
 	if(str == "ES") {
-		tmp.append(1, (char)0x00);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x00);
 	}
 	if(str == "SS") {
-		tmp.append(1, (char)0x10);
+		retVal.valid = Valid;
+		retVal.data.append(1, (char)0x10);
 	}
-	return tmp;
+
+	if(retVal.data.size() == 0) {
+		retVal.data = "Invalid segment register";
+	}
+
+	return retVal;
 }
 
-std::string Variant::getDword(const std::string& str) {
+CmdOperand Variant::getDword(const std::string& str) {
 	unsigned int div;
-	if(str.find("WORD") != 0 || (div = str.find(":")) == std::string::npos)
-		return "";
+	CmdOperand retVal;
+	retVal.type = Imm32;
+	retVal.valid = Error;
+
+	if(str.find("WORD") != 0 || (div = str.find(":")) == std::string::npos) {
+		retVal.data = "Invalid dword format 'WORD 0xXXXX:0xXXXX";
+		return retVal;
+	}
 
 	std::string tmp;
 	unsigned int beg = str.find(" ") + 1;
-	tmp.append(getWord(str.substr(beg, div - beg)));
-	if(tmp == "")
-		return tmp;
+	CmdOperand c = getWord(str.substr(beg, div - beg));
+	if(c.valid == Error) {
+		c.type = Imm32;
+		return c;
+	}
+	tmp.assign(c.data);
 	unsigned int size = tmp.size();
-	tmp.append(getWord(str.substr(div + 1)));
-	if(tmp.size() == size)
-		return "";
-	return tmp;
+	c = getWord(str.substr(div + 1));
+	if(c.valid == Error) {
+		c.type = Imm32;
+		return c;
+	}
+	tmp.append(c.data);
+
+	if(tmp.size() == size) {
+		retVal.data = "Malformed operand"
+		return retVal;
+	}
+	retVal.valid = Valid;
+	retVal.data = tmp;
+
+	return retVal;
 }
 
-std::string Variant::getDirectAddr(const std::string& str) {
+CmdOperand Variant::getDirectAddr(const std::string& str) {
+	CmdOperand retVal;
+	retVal.type = Imm16;
+	retVal.valid = Error;
+
 	if(str[0] != '[' || str[str.size() - 1] != ']') {
-		return "";
+		retVal.data = "Invalid address";
+		return retVal;
 	}
 	return getWord(str);
 }
