@@ -418,6 +418,7 @@ CmdOperand Variant::getRm8(const std::string & str, bool isOp1) {
 
 	std::string tmp = str;
 	CmdOperand retVal;
+
 	retVal.type = Rm8;
 
 	if(tmp == "AL") {
@@ -484,6 +485,7 @@ CmdOperand Variant::getRm16(const std::string & str, bool isOp1) {
 
 	std::string tmp = str;
 	CmdOperand retVal;
+	retVal.type = Rm16;
 
 	if(tmp == "AX") {
 		retVal.valid = Valid;
@@ -547,7 +549,7 @@ CmdOperand Variant::getRm16(const std::string & str, bool isOp1) {
 CmdOperand Variant::_getRm(const std::string & str, eCmdOpType type) {
 
 	std::string tmp;
-	std::string disp;
+	CmdOperand disp;
 	CmdOperand retVal;
 	retVal.type = type;
 	retVal.valid = Error;
@@ -573,13 +575,17 @@ CmdOperand Variant::_getRm(const std::string & str, eCmdOpType type) {
 		} else if(tmp == "DI") {
 			terms |= 0x10;
 			terms++;
-		} else if((disp = getWord(tmp)) != "") {
+		} else if((disp = getWord(tmp)).data != "" && disp.valid == Valid) {
 			terms++;
+		} else if (disp.valid == Label) {
+			retVal.valid = Label;
+			retVal.label.assign(disp.label);
 		} else { //label
 			//check for starting letter, and valid characters
 			if(tmp.find_first_not_of("QWERTYUIOPASDFGHJKLZXCVBNM1234567890_") == 
 					std::string::npos &&
-				tmp.find_first_of("QWERTYUIOPASDFGHJKLZXCVBNM") == 0) {
+				tmp.find_first_of("QWERTYUIOPASDFGHJKLZXCVBNM") == 0 &&
+				retVal.label.size() == 0) {
 
 				retVal.label = tmp;
 				retVal.valid = Label;
@@ -599,10 +605,11 @@ CmdOperand Variant::_getRm(const std::string & str, eCmdOpType type) {
 	}
 
 	if(terms == 0x41) {//BP only exception
-		disp.append(1, '\0');
+		disp.valid = Valid;
+		disp.data.append(1, '\0');
 	}
 
-	if(disp.size() == 1)
+	if((disp.data.size() == 1 && disp.valid == Valid) || disp.valid == Label)
 		modrm |= 0x40;
 	
 	if(terms & 0xF0) { //there are registers
@@ -627,12 +634,12 @@ CmdOperand Variant::_getRm(const std::string & str, eCmdOpType type) {
 		} else if(terms & 0x10) { //di
 			modrm |= 5;
 		}
-		if(disp.size() == 2) {
+		if((disp.data.size() == 2 && disp.valid == Valid) || disp.valid == Label) {
 			modrm |= 0x80;
 		}
 	} else { //disp only case
-		if(disp.size() == 1) {
-			disp = '\0' + disp;
+		if(disp.data.size() == 1 && disp.valid == Valid) {
+			disp.data = '\0' + disp.data;
 		}
 		modrm = 0x06;
 	}
@@ -641,8 +648,8 @@ CmdOperand Variant::_getRm(const std::string & str, eCmdOpType type) {
 		retVal.valid = Valid;
 
 	retVal.data.append(1, modrm);
-	if(disp.size() != 0)
-		retVal.data.append(disp);
+	if(disp.data.size() != 0 && disp.valid == Valid)
+		retVal.data.append(disp.data);
 
 	return retVal;
 }
@@ -797,7 +804,7 @@ CmdOperand Variant::getDword(const std::string& str) {
 	tmp.append(c.data);
 
 	if(tmp.size() == size) {
-		retVal.data = "Malformed operand"
+		retVal.data = "Malformed operand";
 		return retVal;
 	}
 	retVal.valid = Valid;

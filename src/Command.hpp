@@ -43,7 +43,7 @@ class Command {
 	public:
 		static Command* MakeCommand(std::string inst, std::string prefix, std::vector<std::string> operands, std::string label);
 		Command(const std::string & prefix, const unsigned int opcode) 
-			: mPrefix(prefix), mMod('\0'), bModrm(false), mOpcode(opcode), mAddr(0) {}
+			: mPrefix(prefix), mMod('\0'), bModrm(false), mOpcode(opcode), mAddr(0), mNeedsLabel(false) {}
 
 		unsigned int GetLength() const { return mInst.size();}
 		void SetAddr(unsigned int addr) { mAddr = addr; }
@@ -64,6 +64,10 @@ class Command {
 		void AppendOperand(const CmdOperand & op);
 
 		void SetLine(const std::string & str) { mLine.assign(str.substr(0, str.size()-1)); }
+
+		const std::string & getLabel() const { return mLabel; }
+		bool hasLabel() const { return mNeedsLabel; }
+		void updateLabel(unsigned int val) { mLblVal = val; mNeedsLabel = false; }
 
 		//Operators for sorting
 		inline bool operator <(const Command& cmd) const
@@ -95,6 +99,7 @@ class Command {
 			mOpcode = cmd.mOpcode;
 			mAddr = cmd.mAddr;
 			mLine.assign(cmd.mLine);
+			mNeedsLabel = cmd.mNeedsLabel;
 			return *this;
 		}
 
@@ -131,4 +136,7 @@ class Command {
 		unsigned int mOpcode;
 		unsigned int mAddr;
 		std::string mLine;
+		std::string mLabel;
+		unsigned int mLblVal;
+		bool mNeedsLabel;
 };

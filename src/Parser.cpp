@@ -130,6 +130,24 @@ std::string Parser::parseLine(std::string line) {
 
 	newCmd->SetLine(line);
 	newCmd->SetAddr(mAddr);
+	if(label.size() != 0) {
+		if(mSymTbl.count(label) == 0) {
+			mSymTbl[label] = mAddr;
+		} else {
+			delete newCmd;
+			return "'" + label + "' already defined";
+		}
+	}
+	if(newCmd->hasLabel()) {
+		if(mSymTbl.count(newCmd->getLabel()) != 0) {
+			unsigned int val = mSymTbl[newCmd->getLabel()];
+			if(val != 0xFFFFFFFF) {
+				newCmd->updateLabel(val & 0xFFFF);
+			}
+		} else {
+			mSymTbl[newCmd->getLabel()] = 0xFFFFFFFF;
+		}
+	}
 	mAddr += newCmd->GetLength();
 	mSize += newCmd->GetLength();
 	mLines.push_back(newCmd);

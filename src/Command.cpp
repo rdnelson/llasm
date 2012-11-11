@@ -70,6 +70,37 @@ void Command::AppendReg(const std::string & str) {
 	UpdateInst();
 }
 
+void Command::AppendOperand(const CmdOperand & cmd) {
+	if(cmd.valid == Label) {
+		mNeedsLabel = true;
+		mLabel = cmd.label;
+		if(cmd.data.size() == 0)
+			return;
+	} else if(cmd.valid == Error) {
+		SetErr(cmd.data);
+		return;
+	}
+
+	switch(cmd.type) {
+		case Rm8:
+		case Rm16:
+			AppendRm(cmd.data);
+			break;
+		case Reg8:
+		case Reg16:
+			AppendReg(cmd.data);
+			break;
+		case Imm8:
+		case Imm16:
+		case Imm32:
+			AppendImm(cmd.data);
+			break;
+		default:
+			SetErr("Invalid operand type");
+
+	}
+}
+
 std::string Command::GetVirgoStr() {
 
 	UpdateInst();

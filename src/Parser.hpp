@@ -16,6 +16,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 class Parser {
 	public:
@@ -35,6 +36,7 @@ class Parser {
 		void Trim(std::string& str);
 
 		std::vector<Command*> mLines;
+		std::map<std::string, unsigned int> mSymTbl;
 		unsigned int mAddr;
 		unsigned int mSize;
 
